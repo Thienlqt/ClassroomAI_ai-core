@@ -87,3 +87,54 @@ def test_api_serves_catalogued_images():
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     assert len(response.content) > 1000
+
+
+def test_api_serves_reference_classroom_app():
+    model = FakeModel([])
+    agent = ClassroomAgent(model=model, image_catalog=load_image_catalog())
+
+    with TestClient(create_app(agent)) as client:
+        page = client.get("/")
+        script = client.get("/static/app.js")
+        styles = client.get("/static/styles.css")
+
+    assert page.status_code == 200
+    assert "Spatial AI Classroom" in page.text
+    assert 'id="stageContent"' in page.text
+    assert script.status_code == 200
+    assert "/v1/sessions/" in script.text
+    assert "ui.show_choices" in script.text
+    assert "ui.show_image" in script.text
+    assert styles.status_code == 200
+    assert ".learning-stage" in styles.text
+
+
+def test_app_completes_image_action_round_trip():
+    model = FakeModel(
+        [
+            model_message(
+                tool_calls=[
+                    tool_call("show_image", {"image_id": "lion", "caption": "Lion"})
+                ]
+            ),
+            model_message("This is a lion. A lion can roar."),
+        ]
+    )
+    agent = ClassroomAgent(model=model, image_catalog=load_image_catalog())
+
+    with TestClient(create_app(agent)) as client:
+        first = client.post(
+            "/v1/sessions/image-demo/messages",
+            json={"message": "Show me a lion."},
+        )
+        action = first.json()["action"]
+        second = client.post(
+            f"/v1/sessions/image-demo/actions/{action['call_id']}/result",
+            json={"result": {"success": True}},
+        )
+
+    assert first.status_code == 200
+    assert action["type"] == "ui.show_image"
+    assert action["payload"]["image_url"] == "/assets/images/lion.png"
+    assert second.status_code == 200
+    assert second.json()["speech"] == "This is a lion. A lion can roar."

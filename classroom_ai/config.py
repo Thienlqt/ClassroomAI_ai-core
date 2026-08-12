@@ -19,6 +19,7 @@ class Settings:
     image_catalog_path: Path = PROJECT_ROOT / "assets" / "images" / "catalog.json"
     system_prompt_path: Path = PROJECT_ROOT / "prompts" / "english_teacher.txt"
     tool_definitions_dir: Path = PROJECT_ROOT / "tool_definitions"
+    frontend_dir: Path = PROJECT_ROOT / "frontend"
     cors_origins: str = os.getenv("CLASSROOM_CORS_ORIGINS", "*")
 
     @property

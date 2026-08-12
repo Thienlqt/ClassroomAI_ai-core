@@ -23,6 +23,7 @@ classroom_ai/
     └── registry.py       # Validates calls and maps them to UI actions
 
 assets/images/            # Approved offline images and catalog
+frontend/                 # Reference browser classroom app
 lessons/                  # Bounded lesson content
 prompts/                  # Editable model prompts
 tool_definitions/         # Ollama function/tool JSON schemas
@@ -170,8 +171,23 @@ uvicorn api:app --host 127.0.0.1 --port 8000 --reload
 
 Useful development pages:
 
+- Reference classroom app: `http://127.0.0.1:8000/`
 - API status: `http://127.0.0.1:8000/health`
 - Interactive API documentation: `http://127.0.0.1:8000/docs`
+
+The reference classroom app is served by the same FastAPI process and needs no Node.js
+or separate frontend command. It provides:
+
+- student message input and teacher subtitles
+- projector-friendly `ui.show_choices` buttons
+- actual rendering of `ui.show_image` assets
+- automatic action-result callbacks using `call_id`
+- one browser-local session ID and a **New lesson** reset
+- responsive, keyboard-accessible loading and error states
+
+The app team can run it directly as an integration reference or copy the request/action
+logic from `frontend/app.js` into their own UI framework. AI Core remains responsible
+for conversation state and answer checking; the browser owns only display and input.
 
 The prototype allows browser requests from any origin. Set a restricted comma-separated
 list before deployment, for example:

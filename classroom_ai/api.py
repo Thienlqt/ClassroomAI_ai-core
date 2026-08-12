@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from classroom_ai.agent import AgentStateError, ClassroomAgent
@@ -34,6 +35,15 @@ def create_app(
         StaticFiles(directory=settings.images_dir),
         name="classroom-images",
     )
+    app.mount(
+        "/static",
+        StaticFiles(directory=settings.frontend_dir),
+        name="classroom-app-static",
+    )
+
+    @app.get("/", include_in_schema=False)
+    def classroom_app() -> FileResponse:
+        return FileResponse(settings.frontend_dir / "index.html")
 
     @app.get("/health")
     def health() -> dict[str, str]:
