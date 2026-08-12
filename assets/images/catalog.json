@@ -1,0 +1,18 @@
+{
+  "dog": {
+    "label": "Dog",
+    "path": "assets/images/dog.png"
+  },
+  "eagle": {
+    "label": "Eagle",
+    "path": "assets/images/eagle.png"
+  },
+  "fish": {
+    "label": "Fish",
+    "path": "assets/images/fish.png"
+  },
+  "lion": {
+    "label": "Lion",
+    "path": "assets/images/lion.png"
+  }
+}
