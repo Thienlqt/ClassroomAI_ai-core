@@ -50,3 +50,24 @@ Verify it:
 
 The optional multimodal projector is not needed. ClassroomAI currently asks the app to
 display catalogued images; it does not send images, video, or audio into the model.
+
+## CPU face models
+
+Face recognition uses two small official OpenCV Zoo ONNX models:
+
+- YuNet `face_detection_yunet_2023mar.onnx` finds and aligns faces.
+- SFace `face_recognition_sface_2021dec.onnx` creates identity embeddings.
+
+The downloader pins OpenCV Zoo release `4.10.0` and verifies these SHA-256 hashes:
+
+- YuNet: `8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4`
+- SFace: `0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79`
+
+Download both into the ignored `models/vision/` directory:
+
+```bash
+python scripts/download_face_models.py
+```
+
+These are independent of Gemma and use the CPU through OpenCV. They do not perform
+raised-hand detection or general image understanding.

@@ -6,6 +6,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _project_path(value: str) -> Path:
+    path = Path(value).expanduser()
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
 @dataclass(frozen=True)
 class Settings:
     model_provider: str = field(
@@ -34,8 +39,45 @@ class Settings:
     system_prompt_path: Path = PROJECT_ROOT / "prompts" / "english_teacher.txt"
     tool_definitions_dir: Path = PROJECT_ROOT / "tool_definitions"
     frontend_dir: Path = PROJECT_ROOT / "frontend"
+    piper_voice_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv(
+                "CLASSROOM_PIPER_VOICE",
+                "voices/en_US-lessac-medium.onnx",
+            )
+        )
+    )
+    face_detector_model_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv(
+                "CLASSROOM_FACE_DETECTOR_MODEL",
+                "models/vision/face_detection_yunet_2023mar.onnx",
+            )
+        )
+    )
+    face_recognizer_model_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv(
+                "CLASSROOM_FACE_RECOGNIZER_MODEL",
+                "models/vision/face_recognition_sface_2021dec.onnx",
+            )
+        )
+    )
+    face_cosine_threshold: float = field(
+        default_factory=lambda: float(
+            os.getenv("CLASSROOM_FACE_COSINE_THRESHOLD", "0.45")
+        )
+    )
+    face_database_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv("CLASSROOM_FACE_DATABASE", "data/faces.sqlite3")
+        )
+    )
     cors_origins: str = field(
-        default_factory=lambda: os.getenv("CLASSROOM_CORS_ORIGINS", "*")
+        default_factory=lambda: os.getenv(
+            "CLASSROOM_CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173",
+        )
     )
 
     @property

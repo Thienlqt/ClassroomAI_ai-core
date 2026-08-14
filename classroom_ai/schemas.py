@@ -57,6 +57,14 @@ class ActionResultRequest(BaseModel):
     result: dict[str, Any]
 
 
+class SpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ImageFrameRequest(BaseModel):
+    image_base64: str = Field(min_length=1, max_length=15_000_000)
+
+
 class PendingToolCall(BaseModel):
     call_id: str
     provider_call_id: str

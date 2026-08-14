@@ -17,6 +17,12 @@ models/*
 *.gguf
 *.safetensors
 
+voices/*
+!voices/README.md
+data/*
+!data/README.md
+.runtime/
+
 dist/
 build/
 *.egg-info/

@@ -16,6 +16,9 @@ prompts/                  # Editable model prompts
 scripts/                  # Cross-platform model and API launchers
 tool_definitions/         # Provider-neutral function/tool JSON schemas
 tests/                    # Agent, tool, adapter, launcher, and API tests
+voices/                   # Local Piper voice weights; ignored by Git
+data/                     # Local biometric database; ignored by Git
+integrations/hermes/      # Isolated teacher-assistant configuration
 ```
 
 `english_agent.py` is the terminal demo. `api.py` is the small Uvicorn entry point for
@@ -145,6 +148,21 @@ python scripts/start_api.py
 `OllamaGateway` and `OpenAICompatibleGateway` translate the same provider-neutral
 conversation history. Switching providers does not require changes to the agent, tools,
 prompt, lessons, API, or frontend.
+
+## Optional teacher, speech, and face components
+
+The next local components are now isolated behind small adapters:
+
+- **Hermes Agent** provides an experimental teacher-only planning mode using the same
+  llama.cpp endpoint. It is not part of the student response loop.
+- **Piper TTS** converts teacher speech into local WAV audio through `POST /v1/speech`.
+- **YuNet + SFace** perform CPU-only face detection and recognition through
+  `POST /v1/faces/recognize`.
+- **FaceEmbeddingStore** keeps consented normalized SFace vectors in a local SQLite
+  database and performs cosine matching. It never stores photos.
+
+Setup, API examples, hardware limits, licensing, and biometric safeguards are in
+[`docs/OPTIONAL_COMPONENTS.md`](docs/OPTIONAL_COMPONENTS.md).
 
 ## Run the terminal demo
 

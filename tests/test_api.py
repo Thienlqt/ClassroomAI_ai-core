@@ -1,9 +1,31 @@
+import base64
+
 from fastapi.testclient import TestClient
 
 from classroom_ai.agent import ClassroomAgent
 from classroom_ai.api import create_app
 from classroom_ai.content import load_image_catalog
+from classroom_ai.vision.schemas import BoundingBox, RecognizedFace
 from tests.helpers import FakeModel, model_message, tool_call
+
+
+class FakeSpeech:
+    def synthesize(self, text):
+        return b"RIFF-fake-" + text.encode()
+
+
+class FakeFaceRecognition:
+    def recognize(self, image_bytes):
+        assert image_bytes == b"fake-image"
+        return [
+            RecognizedFace(
+                bounds=BoundingBox(x_min=0.1, y_min=0.2, x_max=0.3, y_max=0.8),
+                detection_score=0.98,
+                subject_id="student-1",
+                display_name="Student One",
+                similarity=0.82,
+            )
+        ]
 
 
 def test_app_completes_choice_action_round_trip():
@@ -138,3 +160,31 @@ def test_app_completes_image_action_round_trip():
     assert action["payload"]["image_url"] == "/assets/images/lion.png"
     assert second.status_code == 200
     assert second.json()["speech"] == "This is a lion. A lion can roar."
+
+
+def test_app_exposes_local_speech_as_wav():
+    agent = ClassroomAgent(model=FakeModel([]), image_catalog=load_image_catalog())
+
+    with TestClient(create_app(agent, speech=FakeSpeech())) as client:
+        response = client.post("/v1/speech", json={"text": "Hello"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "audio/wav"
+    assert response.content == b"RIFF-fake-Hello"
+
+
+def test_app_exposes_server_side_cosine_face_recognition():
+    agent = ClassroomAgent(model=FakeModel([]), image_catalog=load_image_catalog())
+    encoded = base64.b64encode(b"fake-image").decode()
+
+    with TestClient(
+        create_app(agent, face_recognition=FakeFaceRecognition())
+    ) as client:
+        response = client.post(
+            "/v1/faces/recognize", json={"image_base64": encoded}
+        )
+
+    assert response.status_code == 200
+    assert response.json()[0]["bounds"]["x_min"] == 0.1
+    assert response.json()[0]["subject_id"] == "student-1"
+    assert response.json()[0]["similarity"] == 0.82

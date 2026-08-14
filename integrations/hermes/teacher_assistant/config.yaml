@@ -1,0 +1,17 @@
+model:
+  default: gemma4-e4b
+  provider: custom
+  base_url: http://127.0.0.1:8080/v1
+  api_key: local-no-key
+  context_length: 65536
+
+agent:
+  max_turns: 12
+
+compression:
+  enabled: true
+  threshold: 0.50
+  target_ratio: 0.20
+
+display:
+  show_reasoning: false

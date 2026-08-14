@@ -1,0 +1,13 @@
+from typing import Protocol
+
+from classroom_ai.vision.schemas import RecognizedFace
+
+
+class FaceRecognitionUnavailableError(RuntimeError):
+    """Raised when local face recognition cannot run."""
+
+
+class FaceRecognitionService(Protocol):
+    """Trusted face-recognition boundary used by the HTTP application."""
+
+    def recognize(self, image_bytes: bytes) -> list[RecognizedFace]: ...

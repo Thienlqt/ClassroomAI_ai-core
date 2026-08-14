@@ -1,21 +1,62 @@
+import base64
+import binascii
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from classroom_ai.agent import AgentStateError, ClassroomAgent
+from classroom_ai.audio.piper import PiperSpeech, PiperUnavailableError
 from classroom_ai.config import settings
-from classroom_ai.schemas import ActionResultRequest, AgentOutput, StudentMessageRequest
+from classroom_ai.schemas import (
+    ActionResultRequest,
+    AgentOutput,
+    ImageFrameRequest,
+    SpeechRequest,
+    StudentMessageRequest,
+)
 from classroom_ai.sessions import SessionStore
 from classroom_ai.tools.registry import ToolError
+from classroom_ai.vision.base import (
+    FaceRecognitionService,
+    FaceRecognitionUnavailableError,
+)
+from classroom_ai.vision.face_recognition import OpenCVFaceRecognition
+from classroom_ai.vision.schemas import RecognizedFace
+
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+def _decode_image(value: str) -> bytes:
+    encoded = value.strip()
+    if encoded.startswith("data:"):
+        try:
+            metadata, encoded = encoded.split(",", 1)
+        except ValueError as error:
+            raise ValueError("Invalid image data URL") from error
+        if ";base64" not in metadata:
+            raise ValueError("Image data URL must use base64 encoding")
+    try:
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise ValueError("image_base64 is not valid base64") from error
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise ValueError("Decoded image cannot exceed 10 MiB")
+    return image_bytes
 
 
 def create_app(
     agent: ClassroomAgent | None = None,
     store: SessionStore | None = None,
+    speech: PiperSpeech | None = None,
+    face_recognition: FaceRecognitionService | None = None,
 ) -> FastAPI:
     classroom_agent = agent or ClassroomAgent()
     session_store = store or SessionStore(classroom_agent)
+    speech_service = speech or PiperSpeech()
+    face_service = face_recognition or OpenCVFaceRecognition()
 
     app = FastAPI(
         title="Spatial AI Classroom Core",
@@ -24,6 +65,8 @@ def create_app(
     )
     app.state.agent = classroom_agent
     app.state.sessions = session_store
+    app.state.speech = speech_service
+    app.state.face_recognition = face_service
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
@@ -112,6 +155,29 @@ def create_app(
     @app.delete("/v1/sessions/{session_id}", status_code=204)
     def delete_session(session_id: str) -> None:
         session_store.delete(session_id)
+
+    @app.post("/v1/speech", response_class=Response)
+    def synthesize_speech(request: SpeechRequest) -> Response:
+        try:
+            audio = speech_service.synthesize(request.text)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except PiperUnavailableError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        return Response(
+            content=audio,
+            media_type="audio/wav",
+            headers={"Content-Disposition": 'inline; filename="speech.wav"'},
+        )
+
+    @app.post("/v1/faces/recognize", response_model=list[RecognizedFace])
+    def recognize_faces(request: ImageFrameRequest) -> list[RecognizedFace]:
+        try:
+            return face_service.recognize(_decode_image(request.image_base64))
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except FaceRecognitionUnavailableError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
 
     return app
 
