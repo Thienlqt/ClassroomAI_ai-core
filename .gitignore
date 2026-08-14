@@ -12,7 +12,8 @@ htmlcov/
 .idea/
 .vscode/*.local.json
 
-models/
+models/*
+!models/README.md
 *.gguf
 *.safetensors
 

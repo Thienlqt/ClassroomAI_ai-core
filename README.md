@@ -7,153 +7,148 @@ student interaction.
 ## Project structure
 
 ```text
-classroom_ai/
-├── agent.py              # Gemma conversation and tool-call orchestration
-├── api.py                # FastAPI endpoints used by the classroom app
-├── config.py             # Paths and environment settings
-├── content.py            # Lesson and image-catalog loading
-├── model.py              # Local Ollama adapter
-├── policies.py           # Guards against fake/unrendered visual claims
-├── prompts.py            # System-prompt template rendering
-├── schemas.py            # Shared Pydantic/API data contracts
-├── sessions.py           # Prototype in-memory conversation sessions
-├── terminal.py           # Local terminal UI adapter
-└── tools/
-    ├── definitions.py    # Loads JSON definitions sent to Gemma
-    └── registry.py       # Validates calls and maps them to UI actions
-
+classroom_ai/             # Agent, runtime adapters, API, sessions, and policies
 assets/images/            # Approved offline images and catalog
 frontend/                 # Reference browser classroom app
 lessons/                  # Bounded lesson content
+models/                   # Local GGUF files; model weights are ignored by Git
 prompts/                  # Editable model prompts
-tool_definitions/         # Ollama function/tool JSON schemas
-tests/                    # Agent, tool, content, and API tests
+scripts/                  # Cross-platform model and API launchers
+tool_definitions/         # Provider-neutral function/tool JSON schemas
+tests/                    # Agent, tool, adapter, launcher, and API tests
 ```
 
-`english_agent.py` remains a small compatibility entry point for the terminal demo.
-`api.py` is the small Uvicorn entry point for the app integration.
+`english_agent.py` is the terminal demo. `api.py` is the small Uvicorn entry point for
+app integration. Model-specific request translation is isolated in
+`classroom_ai/model.py`.
 
 ## Recommended model and runtime
 
-The tested development configuration is:
+The tested default configuration is:
 
-- Model: **Gemma 4 E4B instruction-tuned**, exposed by Ollama as `gemma4:e4b`
-- Runtime: **Ollama**
+- Model: **Google Gemma 4 E4B instruction-tuned QAT Q4_0 GGUF**
+- Model repository: [`google/gemma-4-E4B-it-qat-q4_0-gguf`](https://huggingface.co/google/gemma-4-E4B-it-qat-q4_0-gguf)
+- File: `models/gemma-4-E4B_q4_0-it.gguf`
+- Runtime: **llama.cpp** using its OpenAI-compatible `llama-server`
 - Python: **3.11**
-- Current development machine: Apple Silicon Mac; target Intel/OpenVINO deployment
-  remains future work and must be benchmarked on real Intel hardware.
+- Tested host: Apple Silicon macOS with llama.cpp build `b10360`
+- Planned host: 16 GB Intel AI PC, initially using CPU inference
 
-Ollama currently lists `gemma4:e4b` as a 9.6 GB model with a 128K context window.
-See the [official Ollama model page](https://ollama.com/library/gemma4/tags) and the
-[official Google Gemma 4 checkpoint](https://huggingface.co/google/gemma-4-E4B).
+The model is about 4.8 GiB on disk. The launch script uses an 8,192-token context and
+one server slot to leave working memory for the operating system and ClassroomAI. It
+disables multimodal loading because the current app displays catalogued images instead
+of sending visual input to Gemma.
 
-Ollama is recommended for this prototype because that exact configuration has passed
-the tool-call and feedback tests in this repository.
+The exact download URL, size, checksum, and platform-specific verification commands are
+in [`models/README.md`](models/README.md). Model weights are ignored by Git and must not
+be pushed to GitHub.
 
-### Python setup
+## Setup on this Mac
 
-Use the existing environment:
+Use the existing Conda environment; do not create another one:
 
 ```bash
 conda activate classroom-ai
 pip install -r requirements.txt
 ```
 
-For a different machine where the environment does not exist yet:
+Install llama.cpp with Homebrew:
 
 ```bash
-conda create -n classroom-ai python=3.11 pip -y
+brew install llama.cpp
+```
+
+Download and verify the official model by following [`models/README.md`](models/README.md).
+
+Open two terminals in the repository. Start the model first:
+
+```bash
 conda activate classroom-ai
-pip install -r requirements.txt
+python scripts/start_model.py
 ```
 
-### Option A — Ollama (recommended and tested)
-
-Install Ollama using its [official download guide](https://ollama.com/download), then:
+Then start ClassroomAI:
 
 ```bash
-ollama pull gemma4:e4b
-ollama list
+conda activate classroom-ai
+python scripts/start_api.py --reload
 ```
 
-Configure AI Core:
+The launchers set the llama.cpp provider, model alias, ports, context size, Jinja tool
+calling, and other safe local defaults. Run either launcher with `--dry-run` to inspect
+its command without starting a process.
+
+## Setup on the 16 GB Intel device
+
+Use the same model and the same Python launchers. Install a current llama.cpp release:
+
+- Windows: `winget install llama.cpp`
+- Linux: use the [official installation/build guide](https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md)
+
+Set up Python 3.11, download the model as described in `models/README.md`, then run:
+
+```text
+python scripts/start_model.py
+python scripts/start_api.py
+```
+
+Plain CPU execution is the reliable starting point. Let llama.cpp choose the thread
+count automatically first. If benchmarking shows that a fixed physical-core count is
+better, set `CLASSROOM_LLAMA_THREADS` before starting the model. For example, on an
+8-core Linux machine:
 
 ```bash
+CLASSROOM_LLAMA_THREADS=8 python scripts/start_model.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:CLASSROOM_LLAMA_THREADS = "8"
+python scripts/start_model.py
+```
+
+Intel NPU execution requires a special llama.cpp OpenVINO build and remains experimental,
+so it is not enabled by these launchers. First establish a CPU quality/performance
+baseline on the real device, then evaluate the
+[OpenVINO backend](https://github.com/ggml-org/llama.cpp/blob/master/docs/backend/OPENVINO.md)
+without changing the ClassroomAI application code.
+
+## Runtime settings
+
+The defaults work without exporting environment variables. Copy `.env.example` as a
+reference when a process manager or deployment system will load the values.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `CLASSROOM_MODEL_PROVIDER` | `llama_cpp` | Selects the model adapter |
+| `CLASSROOM_MODEL` | `gemma4-e4b` | Model name sent to the server |
+| `CLASSROOM_MODEL_FILE` | `models/gemma-4-E4B_q4_0-it.gguf` | Local model used by the launcher |
+| `CLASSROOM_OPENAI_BASE_URL` | `http://127.0.0.1:8080/v1` | llama.cpp API endpoint |
+| `CLASSROOM_LLAMA_CONTEXT_SIZE` | `8192` | Model context allocated per slot |
+| `CLASSROOM_LLAMA_PARALLEL` | `1` | Concurrent llama.cpp server slots |
+| `CLASSROOM_LLAMA_THREADS` | automatic | Optional Intel CPU tuning |
+
+### Optional Ollama adapter
+
+The adapter remains available for comparison, but Ollama is no longer installed or
+required by default. Install its optional Python dependency and select it at startup:
+
+```bash
+pip install -r requirements-ollama.txt
 export CLASSROOM_MODEL_PROVIDER=ollama
 export CLASSROOM_MODEL=gemma4:e4b
 export OLLAMA_HOST=http://127.0.0.1:11434
+python scripts/start_api.py
 ```
 
-Ollama starts automatically on many desktop installations. If it is not running:
-
-```bash
-ollama serve
-```
-
-### Option B — llama.cpp (supported adapter, experimental with Gemma 4)
-
-The code can use any server exposing OpenAI-compatible chat completions and tool calls.
-`llama-server` provides that API. Install or build it using the
-[official llama.cpp guide](https://github.com/ggml-org/llama.cpp), and read its
-[server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
-
-llama.cpp requires a compatible **GGUF** instruction-tuned model file. Google's official
-checkpoint is not distributed as GGUF, so either convert it with the current llama.cpp
-conversion tools or choose a third-party GGUF conversion after checking its model card,
-license, checksum, architecture support, and chat template. Do not commit model files;
-`*.gguf` and `models/` are ignored by Git.
-
-Start the server with tool calling enabled:
-
-```bash
-llama-server \
-  --model /absolute/path/to/gemma-4-E4B-it.gguf \
-  --alias gemma4-e4b \
-  --host 127.0.0.1 \
-  --port 8080 \
-  --ctx-size 32768 \
-  --jinja
-```
-
-`--jinja` is important because llama.cpp documents it as the switch for OpenAI-style
-function calling. Some GGUFs may require `--chat-template-file` with a tool-compatible
-template. Gemma 4 tool calling and some architecture features have had active llama.cpp
-compatibility work, so treat this path as experimental and run the complete test/live
-evaluation before using it in a demo. Relevant upstream references:
-
-- [llama.cpp function-calling documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md)
-- [Gemma 4 E2B/E4B PLE compatibility report](https://github.com/ggml-org/llama.cpp/issues/22243)
-
-Configure AI Core in another terminal:
-
-```bash
-export CLASSROOM_MODEL_PROVIDER=llama_cpp
-export CLASSROOM_MODEL=gemma4-e4b
-export CLASSROOM_OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-export CLASSROOM_OPENAI_API_KEY=local-no-key
-```
-
-Then run the same terminal or HTTP API commands below. No agent, tool, prompt, lesson,
-or frontend code changes are required.
-
-### How runtime switching works
-
-`classroom_ai/model.py` contains two adapters:
-
-- `OllamaGateway` translates the shared conversation into Ollama's message format.
-- `OpenAICompatibleGateway` translates it into the OpenAI-compatible format used by
-  llama.cpp, including tool-call IDs and JSON-string function arguments.
-
-`CLASSROOM_MODEL_PROVIDER` selects the adapter at startup. Everything above that adapter
-uses one provider-neutral message history. Therefore changing runtime should not be a
-major code change. The likely work is operational and evaluative: obtaining the correct
-model format, selecting the right chat template, starting the server, and rechecking
-tool-call accuracy and output quality.
-
-Copy `.env.example` if you want a reference, but export/load the variables in your own
-process manager; this prototype does not automatically load `.env` files.
+`OllamaGateway` and `OpenAICompatibleGateway` translate the same provider-neutral
+conversation history. Switching providers does not require changes to the agent, tools,
+prompt, lessons, API, or frontend.
 
 ## Run the terminal demo
+
+Start `scripts/start_model.py` first, then in another terminal:
 
 ```bash
 conda activate classroom-ai
@@ -162,10 +157,10 @@ python english_agent.py
 
 ## Run the API for the classroom app
 
-Make sure Ollama and `gemma4:e4b` are available, then run:
+Start the model and API launchers as shown above. You can also run Uvicorn directly
+because llama.cpp is now the configuration default:
 
 ```bash
-conda activate classroom-ai
 uvicorn api:app --host 127.0.0.1 --port 8000 --reload
 ```
 
