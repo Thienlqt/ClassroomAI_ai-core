@@ -1,111 +1,17 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Offline interactive English classroom powered by the local AI Core."
+      content="Private, local English classroom powered by ClassroomAI."
     />
-    <title>Spatial AI Classroom</title>
-    <link rel="stylesheet" href="/static/styles.css" />
-    <script src="/static/app.js" defer></script>
+    <meta name="theme-color" content="#eff5ec" />
+    <title>ClassroomAI</title>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <a class="brand" href="/" aria-label="Spatial AI Classroom home">
-          <span class="brand-mark" aria-hidden="true">AI</span>
-          <span>
-            <strong>Spatial AI Classroom</strong>
-            <small>English · Animals and Abilities</small>
-          </span>
-        </a>
-
-        <div class="topbar-actions">
-          <span id="connectionStatus" class="status-pill" role="status">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span id="connectionLabel">Connecting</span>
-          </span>
-          <button id="resetButton" class="quiet-button" type="button">
-            New lesson
-          </button>
-        </div>
-      </header>
-
-      <main class="classroom-layout">
-        <section class="learning-stage" aria-labelledby="stageTitle">
-          <div class="stage-heading">
-            <div>
-              <p class="eyebrow">Learning stage</p>
-              <h1 id="stageTitle">Let’s explore animals</h1>
-            </div>
-            <span class="offline-label">Local AI</span>
-          </div>
-
-          <div id="stageContent" class="stage-content" aria-live="polite">
-            <div class="welcome-card">
-              <span class="welcome-icon" aria-hidden="true">✦</span>
-              <h2>Ready to learn?</h2>
-              <p>
-                Ask for an animal picture or try an interactive question.
-              </p>
-              <div class="suggestion-row" aria-label="Suggested messages">
-                <button class="suggestion" data-message="Show me a picture of a lion.">
-                  Show me a lion
-                </button>
-                <button class="suggestion" data-message="Give me an interactive animal question.">
-                  Start a question
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div id="stageBusy" class="stage-busy" hidden>
-            <span class="spinner" aria-hidden="true"></span>
-            <span>Teacher is thinking…</span>
-          </div>
-        </section>
-
-        <aside class="teacher-panel" aria-labelledby="teacherTitle">
-          <div class="teacher-identity">
-            <div class="avatar" aria-hidden="true">
-              <span>G</span>
-            </div>
-            <div>
-              <p class="eyebrow">Your classroom companion</p>
-              <h2 id="teacherTitle">Gemma</h2>
-            </div>
-          </div>
-
-          <div id="conversation" class="conversation" aria-live="polite">
-            <article class="message teacher-message">
-              <span class="message-label">Teacher</span>
-              <p>Hello! What would you like to learn about animals today?</p>
-            </article>
-          </div>
-
-          <form id="messageForm" class="message-form">
-            <label for="messageInput">Message your teacher</label>
-            <div class="input-row">
-              <input
-                id="messageInput"
-                name="message"
-                type="text"
-                maxlength="2000"
-                autocomplete="off"
-                placeholder="Ask about an animal…"
-                required
-              />
-              <button id="sendButton" class="send-button" type="submit">
-                Send
-              </button>
-            </div>
-          </form>
-
-          <p id="errorMessage" class="error-message" role="alert" hidden></p>
-        </aside>
-      </main>
-    </div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>

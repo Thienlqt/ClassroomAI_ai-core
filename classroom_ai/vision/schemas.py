@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -22,3 +24,21 @@ class RecognizedFace(BaseModel):
     subject_id: str | None = None
     display_name: str | None = None
     similarity: float | None = Field(default=None, ge=-1.0, le=1.0)
+
+
+class FaceEnrollmentRequest(BaseModel):
+    image_base64: str = Field(min_length=1, max_length=15_000_000)
+    subject_id: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+    )
+    display_name: str = Field(min_length=1, max_length=100)
+    consent_confirmed: Literal[True]
+    consent_reference: str = Field(min_length=1, max_length=200)
+
+
+class FaceEnrollmentResult(BaseModel):
+    embedding_id: int
+    subject_id: str
+    display_name: str

@@ -48,6 +48,36 @@ def test_agent_can_return_speech_without_action():
 
     assert output.type == "speech"
     assert output.speech.startswith("Hello!")
+    assert [segment.model_dump() for segment in output.segments] == [
+        {"language": "en-US", "text": "Hello! Let's learn about animals."}
+    ]
+    assert pending is None
+
+
+def test_agent_returns_clean_bilingual_speech_segments():
+    model = FakeModel(
+        [
+            model_message(
+                "[en]A bird can fly.[/en] "
+                "[vi]‘Can’ dùng để nói về khả năng.[/vi] "
+                "[en]What can a fish do?[/en]"
+            )
+        ]
+    )
+    agent = ClassroomAgent(model=model, image_catalog=load_image_catalog())
+
+    output, pending = agent.submit_message(
+        agent.new_conversation(), "Em chưa hiểu từ can."
+    )
+
+    assert output.speech == (
+        "A bird can fly. ‘Can’ dùng để nói về khả năng. What can a fish do?"
+    )
+    assert [segment.model_dump() for segment in output.segments] == [
+        {"language": "en-US", "text": "A bird can fly."},
+        {"language": "vi-VN", "text": "‘Can’ dùng để nói về khả năng."},
+        {"language": "en-US", "text": "What can a fish do?"},
+    ]
     assert pending is None
 
 

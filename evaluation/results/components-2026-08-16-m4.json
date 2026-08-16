@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-16T11:10:26.642881+00:00",
+  "base_url": "http://127.0.0.1:8000",
+  "components": {
+    "health": {
+      "runs": 30,
+      "latency_seconds": {
+        "min": 0.0,
+        "mean": 0.0,
+        "max": 0.003
+      },
+      "response": {
+        "status": "ok",
+        "model": "gemma4-e4b",
+        "provider": "llama_cpp"
+      }
+    },
+    "speech": {
+      "runs": 3,
+      "latency_seconds": {
+        "min": 0.036,
+        "mean": 0.255,
+        "max": 0.693
+      },
+      "audio_bytes": 57388
+    },
+    "transcription": {
+      "runs": 1,
+      "latency_seconds": 0.94,
+      "input_text": "The eagle can fly.",
+      "transcript": "The eagle can fly.",
+      "contains_expected_words": true
+    },
+    "face_recognition": {
+      "runs": 1,
+      "latency_seconds": 0.698,
+      "synthetic_image": "frontend/src/assets/teacher-avatar-preview.png",
+      "faces_detected": 1,
+      "results": [
+        {
+          "bounds": {
+            "x_min": 0.37752020359039307,
+            "y_min": 0.04616038997968038,
+            "x_max": 0.5237165987491608,
+            "y_max": 0.16104953487714133
+          },
+          "detection_score": 0.9226084351539612,
+          "subject_id": null,
+          "display_name": null,
+          "similarity": null
+        }
+      ],
+      "limitation": "Synthetic-image smoke test; not an identity-accuracy test."
+    },
+    "frontend": {
+      "latency_seconds": 0.003,
+      "bytes": 574,
+      "content_type": "text/html; charset=utf-8"
+    },
+    "avatar": {
+      "latency_seconds": 0.033,
+      "bytes": 26781812,
+      "content_type": "application/octet-stream"
+    }
+  },
+  "errors": []
+}

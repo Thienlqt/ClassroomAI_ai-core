@@ -43,10 +43,13 @@ def build_command(
 
 def prepare_home(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    for name in ("config.yaml", "SOUL.md"):
-        destination = path / name
-        if not destination.exists():
-            shutil.copyfile(TEMPLATE_DIR / name, destination)
+    config_path = path / "config.yaml"
+    if not config_path.exists():
+        shutil.copyfile(TEMPLATE_DIR / "config.yaml", config_path)
+
+    # The reviewed safety and teaching policy is source-controlled and must not go
+    # stale in an existing runtime home. Hermes memory remains separate.
+    shutil.copyfile(TEMPLATE_DIR / "SOUL.md", path / "SOUL.md")
 
 
 def _validate(command: list[str]) -> None:

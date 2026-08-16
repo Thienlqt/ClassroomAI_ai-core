@@ -1,13 +1,18 @@
 import base64
 import binascii
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from classroom_ai.agent import AgentStateError, ClassroomAgent
 from classroom_ai.audio.piper import PiperSpeech, PiperUnavailableError
+from classroom_ai.audio.whisper_cpp import (
+    TranscriptionError,
+    TranscriptionUnavailableError,
+    WhisperCppTranscriber,
+)
 from classroom_ai.config import settings
 from classroom_ai.schemas import (
     ActionResultRequest,
@@ -15,6 +20,7 @@ from classroom_ai.schemas import (
     ImageFrameRequest,
     SpeechRequest,
     StudentMessageRequest,
+    TranscriptionResult,
 )
 from classroom_ai.sessions import SessionStore
 from classroom_ai.tools.registry import ToolError
@@ -23,10 +29,15 @@ from classroom_ai.vision.base import (
     FaceRecognitionUnavailableError,
 )
 from classroom_ai.vision.face_recognition import OpenCVFaceRecognition
-from classroom_ai.vision.schemas import RecognizedFace
+from classroom_ai.vision.schemas import (
+    FaceEnrollmentRequest,
+    FaceEnrollmentResult,
+    RecognizedFace,
+)
 
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_AUDIO_BYTES = 15 * 1024 * 1024
 
 
 def _decode_image(value: str) -> bytes:
@@ -51,11 +62,13 @@ def create_app(
     agent: ClassroomAgent | None = None,
     store: SessionStore | None = None,
     speech: PiperSpeech | None = None,
+    transcriber: WhisperCppTranscriber | None = None,
     face_recognition: FaceRecognitionService | None = None,
 ) -> FastAPI:
     classroom_agent = agent or ClassroomAgent()
     session_store = store or SessionStore(classroom_agent)
     speech_service = speech or PiperSpeech()
+    transcription_service = transcriber or WhisperCppTranscriber()
     face_service = face_recognition or OpenCVFaceRecognition()
 
     app = FastAPI(
@@ -66,6 +79,7 @@ def create_app(
     app.state.agent = classroom_agent
     app.state.sessions = session_store
     app.state.speech = speech_service
+    app.state.transcriber = transcription_service
     app.state.face_recognition = face_service
     app.add_middleware(
         CORSMiddleware,
@@ -82,6 +96,11 @@ def create_app(
         "/static",
         StaticFiles(directory=settings.frontend_dir),
         name="classroom-app-static",
+    )
+    app.mount(
+        "/assets/avatar",
+        StaticFiles(directory=settings.avatar_dir, check_dir=False),
+        name="teacher-avatar",
     )
 
     @app.get("/", include_in_schema=False)
@@ -159,7 +178,7 @@ def create_app(
     @app.post("/v1/speech", response_class=Response)
     def synthesize_speech(request: SpeechRequest) -> Response:
         try:
-            audio = speech_service.synthesize(request.text)
+            audio = speech_service.synthesize(request.text, request.language)
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         except PiperUnavailableError as error:
@@ -170,6 +189,22 @@ def create_app(
             headers={"Content-Disposition": 'inline; filename="speech.wav"'},
         )
 
+    @app.post("/v1/audio/transcriptions", response_model=TranscriptionResult)
+    def transcribe_audio(file: UploadFile = File(...)) -> TranscriptionResult:
+        audio = file.file.read(MAX_AUDIO_BYTES + 1)
+        file.file.close()
+        if len(audio) > MAX_AUDIO_BYTES:
+            raise HTTPException(status_code=413, detail="Audio cannot exceed 15 MiB.")
+        try:
+            text = transcription_service.transcribe(audio)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except TranscriptionUnavailableError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        except TranscriptionError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+        return TranscriptionResult(text=text)
+
     @app.post("/v1/faces/recognize", response_model=list[RecognizedFace])
     def recognize_faces(request: ImageFrameRequest) -> list[RecognizedFace]:
         try:
@@ -178,6 +213,25 @@ def create_app(
             raise HTTPException(status_code=422, detail=str(error)) from error
         except FaceRecognitionUnavailableError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
+
+    @app.post("/v1/faces/enroll", response_model=FaceEnrollmentResult)
+    def enroll_face(request: FaceEnrollmentRequest) -> FaceEnrollmentResult:
+        try:
+            embedding_id = face_service.enroll(
+                _decode_image(request.image_base64),
+                subject_id=request.subject_id,
+                display_name=request.display_name,
+                consent_reference=request.consent_reference,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except FaceRecognitionUnavailableError as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        return FaceEnrollmentResult(
+            embedding_id=embedding_id,
+            subject_id=request.subject_id,
+            display_name=request.display_name,
+        )
 
     return app
 

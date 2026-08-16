@@ -1,8 +1,14 @@
 import io
+import subprocess
 import wave
+from pathlib import Path
 import pytest
 
 from classroom_ai.audio.piper import PiperSpeech, PiperUnavailableError
+from classroom_ai.audio.whisper_cpp import (
+    TranscriptionUnavailableError,
+    WhisperCppTranscriber,
+)
 from classroom_ai.vision.base import FaceRecognitionUnavailableError
 from classroom_ai.vision.face_recognition import OpenCVFaceRecognition
 from classroom_ai.vision.face_store import FaceEmbeddingStore
@@ -39,6 +45,49 @@ def test_piper_reports_missing_voice_before_importing_package(tmp_path):
 
     with pytest.raises(PiperUnavailableError, match="Voice not found|voice not found"):
         speech.synthesize("Hello")
+
+
+def test_whisper_cpp_converts_and_transcribes_uploaded_audio(tmp_path):
+    model_path = tmp_path / "whisper.bin"
+    model_path.write_bytes(b"model")
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if command[0] == "ffmpeg":
+            Path(command[-1]).write_bytes(b"normalized-wav")
+        else:
+            output_base = Path(command[command.index("--output-file") + 1])
+            output_base.with_suffix(".txt").write_text(
+                " Can an eagle fly?\n", encoding="utf-8"
+            )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    transcriber = WhisperCppTranscriber(
+        model_path,
+        threads=6,
+        runner=fake_run,
+        command_lookup=lambda command: f"/fake/{command}",
+    )
+
+    text = transcriber.transcribe(b"browser-audio")
+
+    assert text == "Can an eagle fly?"
+    assert commands[0][0] == "ffmpeg"
+    assert commands[1][0] == "whisper-cli"
+    assert commands[1][commands[1].index("--language") + 1] == "auto"
+    assert commands[1][commands[1].index("--threads") + 1] == "6"
+    assert "--no-gpu" in commands[1]
+
+
+def test_whisper_cpp_reports_missing_model(tmp_path):
+    transcriber = WhisperCppTranscriber(
+        tmp_path / "missing.bin",
+        command_lookup=lambda command: f"/fake/{command}",
+    )
+
+    with pytest.raises(TranscriptionUnavailableError, match="model not found"):
+        transcriber.transcribe(b"audio")
 
 
 def test_face_recognition_reports_missing_models_before_importing_opencv(tmp_path):

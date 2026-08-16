@@ -20,28 +20,37 @@ class PiperSpeech:
         self,
         voice_path: Path = settings.piper_voice_path,
         *,
+        vietnamese_voice_path: Path = settings.piper_vietnamese_voice_path,
         voice_factory: Callable[[str], Any] | None = None,
     ):
         self.voice_path = Path(voice_path)
+        self.voice_paths = {
+            "en-US": self.voice_path,
+            "vi-VN": Path(vietnamese_voice_path),
+        }
         self._voice_factory = voice_factory
-        self._voice: Any | None = None
+        self._voices: dict[str, Any] = {}
         self._lock = threading.Lock()
 
     @property
     def config_path(self) -> Path:
         return self.voice_path.with_suffix(self.voice_path.suffix + ".json")
 
-    def _load_voice(self) -> Any:
-        if self._voice is not None:
-            return self._voice
-        if not self.voice_path.is_file():
+    def _load_voice(self, language: str) -> Any:
+        if language in self._voices:
+            return self._voices[language]
+        voice_path = self.voice_paths.get(language)
+        if voice_path is None:
+            raise ValueError(f"Unsupported speech language: {language}")
+        config_path = voice_path.with_suffix(voice_path.suffix + ".json")
+        if not voice_path.is_file():
             raise PiperUnavailableError(
-                f"Piper voice not found: {self.voice_path}. "
+                f"Piper {language} voice not found: {voice_path}. "
                 "Follow voices/README.md to download it."
             )
-        if not self.config_path.is_file():
+        if not config_path.is_file():
             raise PiperUnavailableError(
-                f"Piper voice config not found: {self.config_path}"
+                f"Piper {language} voice config not found: {config_path}"
             )
 
         factory = self._voice_factory
@@ -54,10 +63,11 @@ class PiperSpeech:
                 ) from error
             factory = PiperVoice.load
 
-        self._voice = factory(str(self.voice_path))
-        return self._voice
+        voice = factory(str(voice_path))
+        self._voices[language] = voice
+        return voice
 
-    def synthesize(self, text: str) -> bytes:
+    def synthesize(self, text: str, language: str = "en-US") -> bytes:
         clean_text = text.strip()
         if not clean_text:
             raise ValueError("Speech text cannot be blank")
@@ -65,7 +75,7 @@ class PiperSpeech:
             raise ValueError("Speech text cannot exceed 2000 characters")
 
         with self._lock:
-            voice = self._load_voice()
+            voice = self._load_voice(language)
             buffer = io.BytesIO()
             with wave.open(buffer, "wb") as wav_file:
                 voice.synthesize_wav(clean_text, wav_file)

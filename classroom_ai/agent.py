@@ -6,6 +6,7 @@ from classroom_ai.model import ModelGateway, create_model_gateway
 from classroom_ai.policies import refers_to_unavailable_visual
 from classroom_ai.prompts import build_system_prompt
 from classroom_ai.schemas import AgentOutput, PendingToolCall
+from classroom_ai.teaching import parse_speech_segments
 from classroom_ai.tools.registry import (
     ToolError,
     ToolRegistry,
@@ -36,6 +37,14 @@ def _message_content(message: Any) -> str:
     if content is None and isinstance(message, dict):
         content = message.get("content")
     return (content or "").strip()
+
+
+def _speech_output(content: str) -> AgentOutput:
+    segments = parse_speech_segments(content)
+    if not segments:
+        raise AgentStateError("Model returned empty speech")
+    speech = " ".join(segment.text for segment in segments)
+    return AgentOutput(type="speech", speech=speech, segments=segments)
 
 
 class ClassroomAgent:
@@ -77,7 +86,7 @@ class ClassroomAgent:
                 speech = _message_content(model_message)
                 if not speech:
                     raise AgentStateError("Model returned neither speech nor a tool call")
-                return AgentOutput(type="speech", speech=speech), None
+                return _speech_output(speech), None
 
             if len(calls) != 1:
                 raise ToolError("Only one classroom tool call is allowed per turn")
@@ -170,6 +179,6 @@ class ClassroomAgent:
                 continue
 
             messages.append(model_message)
-            return AgentOutput(type="speech", speech=speech)
+            return _speech_output(speech)
 
         raise AgentStateError("Feedback policy loop ended unexpectedly")

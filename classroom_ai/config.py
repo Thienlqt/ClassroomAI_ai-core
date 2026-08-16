@@ -38,7 +38,12 @@ class Settings:
     image_catalog_path: Path = PROJECT_ROOT / "assets" / "images" / "catalog.json"
     system_prompt_path: Path = PROJECT_ROOT / "prompts" / "english_teacher.txt"
     tool_definitions_dir: Path = PROJECT_ROOT / "tool_definitions"
-    frontend_dir: Path = PROJECT_ROOT / "frontend"
+    frontend_dir: Path = PROJECT_ROOT / "frontend" / "bundle"
+    avatar_dir: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv("CLASSROOM_AVATAR_DIR", "models/avatar")
+        )
+    )
     piper_voice_path: Path = field(
         default_factory=lambda: _project_path(
             os.getenv(
@@ -46,6 +51,40 @@ class Settings:
                 "voices/en_US-lessac-medium.onnx",
             )
         )
+    )
+    piper_vietnamese_voice_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv(
+                "CLASSROOM_PIPER_VIETNAMESE_VOICE",
+                "voices/vi_VN-vais1000-medium.onnx",
+            )
+        )
+    )
+    whisper_model_path: Path = field(
+        default_factory=lambda: _project_path(
+            os.getenv(
+                "CLASSROOM_WHISPER_MODEL",
+                "models/speech/ggml-small.bin",
+            )
+        )
+    )
+    whisper_language: str = field(
+        default_factory=lambda: os.getenv("CLASSROOM_WHISPER_LANGUAGE", "auto")
+    )
+    whisper_use_gpu: bool = field(
+        default_factory=lambda: os.getenv("CLASSROOM_WHISPER_USE_GPU", "0")
+        .strip()
+        .casefold()
+        in {"1", "true", "yes", "on"}
+    )
+    whisper_command: str = field(
+        default_factory=lambda: os.getenv("CLASSROOM_WHISPER_COMMAND", "whisper-cli")
+    )
+    ffmpeg_command: str = field(
+        default_factory=lambda: os.getenv("CLASSROOM_FFMPEG_COMMAND", "ffmpeg")
+    )
+    whisper_threads: int = field(
+        default_factory=lambda: int(os.getenv("CLASSROOM_WHISPER_THREADS", "4"))
     )
     face_detector_model_path: Path = field(
         default_factory=lambda: _project_path(

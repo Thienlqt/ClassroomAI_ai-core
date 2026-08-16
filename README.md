@@ -9,7 +9,7 @@ student interaction.
 ```text
 classroom_ai/             # Agent, runtime adapters, API, sessions, and policies
 assets/images/            # Approved offline images and catalog
-frontend/                 # Reference browser classroom app
+frontend/                 # Vue classroom app, source, and committed production bundle
 lessons/                  # Bounded lesson content
 models/                   # Local GGUF files; model weights are ignored by Git
 prompts/                  # Editable model prompts
@@ -131,6 +131,12 @@ reference when a process manager or deployment system will load the values.
 | `CLASSROOM_LLAMA_CONTEXT_SIZE` | `8192` | Model context allocated per slot |
 | `CLASSROOM_LLAMA_PARALLEL` | `1` | Concurrent llama.cpp server slots |
 | `CLASSROOM_LLAMA_THREADS` | automatic | Optional Intel CPU tuning |
+| `CLASSROOM_PIPER_VOICE` | `voices/en_US-lessac-medium.onnx` | English teacher voice |
+| `CLASSROOM_PIPER_VIETNAMESE_VOICE` | `voices/vi_VN-vais1000-medium.onnx` | Vietnamese support voice |
+| `CLASSROOM_WHISPER_MODEL` | `models/speech/ggml-small.bin` | Multilingual English/Vietnamese speech-to-text model |
+| `CLASSROOM_WHISPER_LANGUAGE` | `auto` | Detect English or Vietnamese input |
+| `CLASSROOM_WHISPER_USE_GPU` | `0` | Keep on-demand transcription from competing with llama.cpp for GPU memory |
+| `CLASSROOM_WHISPER_THREADS` | `4` | CPU threads used for transcription |
 
 ### Optional Ollama adapter
 
@@ -154,12 +160,18 @@ prompt, lessons, API, or frontend.
 The next local components are now isolated behind small adapters:
 
 - **Hermes Agent** provides an experimental teacher-only planning mode using the same
-  llama.cpp endpoint. It is not part of the student response loop.
-- **Piper TTS** converts teacher speech into local WAV audio through `POST /v1/speech`.
+  llama.cpp endpoint. Its policy plans when Vietnamese support is appropriate, but it
+  is not another model call in the live student response loop.
+- **Piper TTS** routes tagged English and Vietnamese segments to separate local voices
+  through `POST /v1/speech`.
+- **whisper.cpp** converts English or Vietnamese microphone recordings into text through
+  `POST /v1/audio/transcriptions`.
 - **YuNet + SFace** perform CPU-only face detection and recognition through
   `POST /v1/faces/recognize`.
 - **FaceEmbeddingStore** keeps consented normalized SFace vectors in a local SQLite
   database and performs cosine matching. It never stores photos.
+- The browser can request consent-first self-enrollment through `POST /v1/faces/enroll`;
+  the API rejects requests that do not explicitly confirm consent.
 
 Setup, API examples, hardware limits, licensing, and biometric safeguards are in
 [`docs/OPTIONAL_COMPONENTS.md`](docs/OPTIONAL_COMPONENTS.md).
@@ -188,19 +200,36 @@ Useful development pages:
 - API status: `http://127.0.0.1:8000/health`
 - Interactive API documentation: `http://127.0.0.1:8000/docs`
 
+The current full-system quality assessment, measured results, release gates, and
+remediation priorities are in
+[`docs/TECHNICAL_ASSESSMENT_2026-08-16.md`](docs/TECHNICAL_ASSESSMENT_2026-08-16.md).
+Repeatable live checks are in [`evaluation/`](evaluation/README.md).
+
 The reference classroom app is served by the same FastAPI process and needs no Node.js
 or separate frontend command. It provides:
 
+- a classroom scene with an animated, blinking VRM teacher
+- a generated classroom background and a static teacher fallback
 - student message input and teacher subtitles
+- a **Speak** button that records up to 30 seconds, transcribes locally, and sends the text to Gemma
+- automatic sequential English/Vietnamese Piper playback when the voices are available
 - projector-friendly `ui.show_choices` buttons
 - actual rendering of `ui.show_image` assets
 - automatic action-result callbacks using `call_id`
+- a bottom-right, opt-in camera preview with separate YuNet detection and SFace match scores
+- an explicit warning and consent dialog before saving three local face embeddings
 - one browser-local session ID and a **New lesson** reset
 - responsive, keyboard-accessible loading and error states
 
-The app team can run it directly as an integration reference or copy the request/action
-logic from `frontend/app.js` into their own UI framework. AI Core remains responsible
-for conversation state and answer checking; the browser owns only display and input.
+The app team can run it directly or work on the Vue source in `frontend/src`. AI Core
+remains responsible for Gemma, conversation state, answer checking, speech, and face
+embeddings; the browser owns only presentation, camera/microphone capture, and user
+interaction. See [`frontend/README.md`](frontend/README.md) for the development command,
+component map, API boundary, and production-build workflow.
+
+The VRM model is ignored by Git because it is about 25.5 MiB and has separate usage
+terms. Download it once using [`models/avatar/README.md`](models/avatar/README.md). If
+it is absent or cannot load, the app automatically uses the included static preview.
 
 The prototype allows browser requests from any origin. Set a restricted comma-separated
 list before deployment, for example:
@@ -213,6 +242,27 @@ export CLASSROOM_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 The app uses a `session_id` of its choice, such as a classroom, teacher, or lesson ID.
 Keep using the same ID to preserve that conversation's context.
+
+### 0. Transcribe a student recording
+
+Send a browser recording or other audio file as multipart form data:
+
+```http
+POST /v1/audio/transcriptions
+Content-Type: multipart/form-data
+
+file=<audio file>
+```
+
+AI Core converts the recording to 16 kHz mono WAV with FFmpeg and returns:
+
+```json
+{"text":"Can an eagle fly?"}
+```
+
+The app then sends that text through the normal session message endpoint below. See
+[`docs/OPTIONAL_COMPONENTS.md`](docs/OPTIONAL_COMPONENTS.md) for installation and
+limits.
 
 ### 1. Send a student message
 
@@ -230,10 +280,18 @@ Gemma can return normal teacher speech:
 ```json
 {
   "type": "speech",
-  "speech": "Hello! Let's learn about animals.",
+  "speech": "A bird can fly. “Can” dùng để nói về khả năng. What can a fish do?",
+  "segments": [
+    {"language": "en-US", "text": "A bird can fly."},
+    {"language": "vi-VN", "text": "“Can” dùng để nói về khả năng."},
+    {"language": "en-US", "text": "What can a fish do?"}
+  ],
   "action": null
 }
 ```
+
+`speech` is clean display text for subtitles and backward-compatible clients.
+`segments` tells a speech-capable app which Piper voice to use for each passage.
 
 Or it can return a choice action:
 
@@ -241,6 +299,7 @@ Or it can return a choice action:
 {
   "type": "action",
   "speech": null,
+  "segments": null,
   "action": {
     "call_id": "generated-id",
     "type": "ui.show_choices",
@@ -277,6 +336,9 @@ AI Core checks the answer, gives the result to Gemma, and returns teacher speech
 {
   "type": "speech",
   "speech": "Great! The eagle can fly.",
+  "segments": [
+    {"language": "en-US", "text": "Great! The eagle can fly."}
+  ],
   "action": null
 }
 ```

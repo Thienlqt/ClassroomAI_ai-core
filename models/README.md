@@ -71,3 +71,26 @@ python scripts/download_face_models.py
 
 These are independent of Gemma and use the CPU through OpenCV. They do not perform
 raised-hand detection or general image understanding.
+
+## English and Vietnamese speech-to-text model
+
+Voice input uses the official multilingual whisper.cpp `small` model with automatic
+language detection:
+
+- Source: <https://huggingface.co/ggerganov/whisper.cpp>
+- File: `models/speech/ggml-small.bin`
+- Size: `487,601,967` bytes (about 465 MiB)
+- SHA-256: `1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b`
+
+Download it from the repository root:
+
+```bash
+mkdir -p models/speech
+curl --location --fail --continue-at - \
+  --output models/speech/ggml-small.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+```
+
+Verify it on macOS with `shasum -a 256 models/speech/ggml-small.bin`, or use
+`sha256sum` on Linux and `Get-FileHash` on Windows. The model is ignored by Git and
+must not be committed.

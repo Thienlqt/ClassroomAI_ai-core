@@ -35,16 +35,28 @@ class UiAction(BaseModel):
     payload: dict[str, Any]
 
 
+class SpeechSegment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    language: Literal["en-US", "vi-VN"]
+    text: str = Field(min_length=1, max_length=2000)
+
+
 class AgentOutput(BaseModel):
     type: Literal["speech", "action"]
     speech: str | None = None
+    segments: list[SpeechSegment] | None = None
     action: UiAction | None = None
 
     @model_validator(mode="after")
     def validate_content(self) -> "AgentOutput":
-        if self.type == "speech" and (not self.speech or self.action is not None):
-            raise ValueError("speech output requires only speech")
-        if self.type == "action" and (self.action is None or self.speech is not None):
+        if self.type == "speech" and (
+            not self.speech or not self.segments or self.action is not None
+        ):
+            raise ValueError("speech output requires speech segments and no action")
+        if self.type == "action" and (
+            self.action is None or self.speech is not None or self.segments is not None
+        ):
             raise ValueError("action output requires only an action")
         return self
 
@@ -59,6 +71,11 @@ class ActionResultRequest(BaseModel):
 
 class SpeechRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+    language: Literal["en-US", "vi-VN"] = "en-US"
+
+
+class TranscriptionResult(BaseModel):
+    text: str
 
 
 class ImageFrameRequest(BaseModel):

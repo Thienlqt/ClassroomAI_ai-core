@@ -1,4 +1,5 @@
 import base64
+import re
 
 from fastapi.testclient import TestClient
 
@@ -10,11 +11,20 @@ from tests.helpers import FakeModel, model_message, tool_call
 
 
 class FakeSpeech:
-    def synthesize(self, text):
-        return b"RIFF-fake-" + text.encode()
+    def synthesize(self, text, language="en-US"):
+        return b"RIFF-fake-" + language.encode() + b"-" + text.encode()
+
+
+class FakeTranscriber:
+    def transcribe(self, audio):
+        assert audio == b"fake-browser-audio"
+        return "Can an eagle fly?"
 
 
 class FakeFaceRecognition:
+    def __init__(self):
+        self.enrollments = []
+
     def recognize(self, image_bytes):
         assert image_bytes == b"fake-image"
         return [
@@ -26,6 +36,19 @@ class FakeFaceRecognition:
                 similarity=0.82,
             )
         ]
+
+    def enroll(
+        self,
+        image_bytes,
+        *,
+        subject_id,
+        display_name,
+        consent_reference,
+    ):
+        self.enrollments.append(
+            (image_bytes, subject_id, display_name, consent_reference)
+        )
+        return 42
 
 
 def test_app_completes_choice_action_round_trip():
@@ -66,6 +89,9 @@ def test_app_completes_choice_action_round_trip():
         assert second.json() == {
             "type": "speech",
             "speech": "Correct! The eagle can fly.",
+            "segments": [
+                {"language": "en-US", "text": "Correct! The eagle can fly."}
+            ],
             "action": None,
         }
 
@@ -117,18 +143,21 @@ def test_api_serves_reference_classroom_app():
 
     with TestClient(create_app(agent)) as client:
         page = client.get("/")
-        script = client.get("/static/app.js")
-        styles = client.get("/static/styles.css")
+        script_path = re.search(r'src="([^"]+\.js)"', page.text).group(1)
+        style_path = re.search(r'href="([^"]+\.css)"', page.text).group(1)
+        script = client.get(script_path)
+        styles = client.get(style_path)
 
     assert page.status_code == 200
-    assert "Spatial AI Classroom" in page.text
-    assert 'id="stageContent"' in page.text
+    assert "ClassroomAI" in page.text
+    assert 'id="app"' in page.text
     assert script.status_code == 200
     assert "/v1/sessions/" in script.text
+    assert "/v1/faces/enroll" in script.text
     assert "ui.show_choices" in script.text
     assert "ui.show_image" in script.text
     assert styles.status_code == 200
-    assert ".learning-stage" in styles.text
+    assert ".classroom" in styles.text
 
 
 def test_app_completes_image_action_round_trip():
@@ -166,11 +195,26 @@ def test_app_exposes_local_speech_as_wav():
     agent = ClassroomAgent(model=FakeModel([]), image_catalog=load_image_catalog())
 
     with TestClient(create_app(agent, speech=FakeSpeech())) as client:
-        response = client.post("/v1/speech", json={"text": "Hello"})
+        response = client.post(
+            "/v1/speech", json={"text": "Xin chào", "language": "vi-VN"}
+        )
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "audio/wav"
-    assert response.content == b"RIFF-fake-Hello"
+    assert response.content == "RIFF-fake-vi-VN-Xin chào".encode()
+
+
+def test_app_exposes_local_audio_transcription():
+    agent = ClassroomAgent(model=FakeModel([]), image_catalog=load_image_catalog())
+
+    with TestClient(create_app(agent, transcriber=FakeTranscriber())) as client:
+        response = client.post(
+            "/v1/audio/transcriptions",
+            files={"file": ("student.webm", b"fake-browser-audio", "audio/webm")},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"text": "Can an eagle fly?"}
 
 
 def test_app_exposes_server_side_cosine_face_recognition():
@@ -188,3 +232,42 @@ def test_app_exposes_server_side_cosine_face_recognition():
     assert response.json()[0]["bounds"]["x_min"] == 0.1
     assert response.json()[0]["subject_id"] == "student-1"
     assert response.json()[0]["similarity"] == 0.82
+
+
+def test_app_requires_consent_and_enrolls_a_face():
+    agent = ClassroomAgent(model=FakeModel([]), image_catalog=load_image_catalog())
+    face_service = FakeFaceRecognition()
+    encoded = base64.b64encode(b"fake-image").decode()
+
+    with TestClient(create_app(agent, face_recognition=face_service)) as client:
+        rejected = client.post(
+            "/v1/faces/enroll",
+            json={
+                "image_base64": encoded,
+                "subject_id": "student-self",
+                "display_name": "Student",
+                "consent_confirmed": False,
+                "consent_reference": "browser-confirmation:test",
+            },
+        )
+        enrolled = client.post(
+            "/v1/faces/enroll",
+            json={
+                "image_base64": encoded,
+                "subject_id": "student-self",
+                "display_name": "Student",
+                "consent_confirmed": True,
+                "consent_reference": "browser-confirmation:test",
+            },
+        )
+
+    assert rejected.status_code == 422
+    assert enrolled.status_code == 200
+    assert enrolled.json() == {
+        "embedding_id": 42,
+        "subject_id": "student-self",
+        "display_name": "Student",
+    }
+    assert face_service.enrollments == [
+        (b"fake-image", "student-self", "Student", "browser-confirmation:test")
+    ]

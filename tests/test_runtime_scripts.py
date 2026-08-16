@@ -5,6 +5,7 @@ from scripts.start_api import build_command as build_api_command
 from scripts.start_api import build_environment
 from scripts.start_hermes_teacher import build_command as build_hermes_command
 from scripts.start_hermes_teacher import build_environment as build_hermes_environment
+from scripts.start_hermes_teacher import prepare_home
 from scripts.start_model import build_command as build_model_command
 
 
@@ -63,3 +64,15 @@ def test_hermes_launcher_is_isolated_and_memory_only():
     assert command[:2] == ["hermes", "chat"]
     assert command[command.index("--toolsets") + 1] == "memory"
     assert command[-2:] == ["--query", "Plan an animal lesson"]
+
+
+def test_hermes_launcher_refreshes_policy_without_overwriting_runtime_config(tmp_path):
+    (tmp_path / "config.yaml").write_text("custom: true\n", encoding="utf-8")
+    (tmp_path / "SOUL.md").write_text("old policy\n", encoding="utf-8")
+
+    prepare_home(tmp_path)
+
+    assert (tmp_path / "config.yaml").read_text(encoding="utf-8") == "custom: true\n"
+    assert "Vietnamese-supported English teaching" in (tmp_path / "SOUL.md").read_text(
+        encoding="utf-8"
+    )
