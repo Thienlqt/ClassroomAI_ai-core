@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -29,7 +28,7 @@ def build_command(
     *,
     query: str | None = None,
 ) -> list[str]:
-    values = os.environ if environ is None else environ
+    values = child_environment(environ)
     command = [
         env_value(values, "CLASSROOM_HERMES_COMMAND", "hermes"),
         "chat",

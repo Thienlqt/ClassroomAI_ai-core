@@ -119,8 +119,17 @@ without changing the ClassroomAI application code.
 
 ## Runtime settings
 
-The defaults work without exporting environment variables. Copy `.env.example` as a
-reference when a process manager or deployment system will load the values.
+The defaults work without configuration. To customize them, create the ignored local
+`.env` file once:
+
+```bash
+cp .env.example .env
+```
+
+`ClassroomAI`, `scripts/start_model.py`, `scripts/start_api.py`, and the Hermes launcher
+load this file automatically. Values explicitly exported in the shell take priority
+over `.env`, and `.env` values take priority over built-in defaults. Never commit
+`.env`; only the safe example file belongs in Git.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |

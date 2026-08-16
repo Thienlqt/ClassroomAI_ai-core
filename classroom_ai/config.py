@@ -2,8 +2,14 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Load repository-local settings without replacing values explicitly exported by
+# the shell, process manager, or deployment environment.
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 def _project_path(value: str) -> Path:

@@ -1,6 +1,7 @@
 import sys
 
 from classroom_ai.config import Settings
+from scripts._shared import project_environment
 from scripts.start_api import build_command as build_api_command
 from scripts.start_api import build_environment
 from scripts.start_hermes_teacher import build_command as build_hermes_command
@@ -17,6 +18,21 @@ def test_llama_cpp_is_the_default_provider(monkeypatch):
 
     assert config.model_provider == "llama_cpp"
     assert config.model == "gemma4-e4b"
+
+
+def test_project_environment_loads_dotenv_without_overriding_shell(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "CLASSROOM_MODEL=from-file\nCLASSROOM_LLAMA_PORT=9090\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CLASSROOM_MODEL", "from-shell")
+    monkeypatch.delenv("CLASSROOM_LLAMA_PORT", raising=False)
+
+    environment = project_environment(env_path=env_path)
+
+    assert environment["CLASSROOM_MODEL"] == "from-shell"
+    assert environment["CLASSROOM_LLAMA_PORT"] == "9090"
 
 
 def test_model_launcher_uses_memory_safe_classroom_defaults():

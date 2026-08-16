@@ -10,13 +10,25 @@ from pathlib import Path
 from typing import Mapping
 
 try:
-    from ._shared import DEFAULT_MODEL_FILE, PROJECT_ROOT, display_command, env_value
+    from ._shared import (
+        DEFAULT_MODEL_FILE,
+        PROJECT_ROOT,
+        display_command,
+        env_value,
+        project_environment,
+    )
 except ImportError:  # Direct execution: python scripts/start_model.py
-    from _shared import DEFAULT_MODEL_FILE, PROJECT_ROOT, display_command, env_value
+    from _shared import (
+        DEFAULT_MODEL_FILE,
+        PROJECT_ROOT,
+        display_command,
+        env_value,
+        project_environment,
+    )
 
 
 def build_command(environ: Mapping[str, str] | None = None) -> list[str]:
-    values = os.environ if environ is None else environ
+    values = project_environment(environ)
     executable = env_value(values, "CLASSROOM_LLAMA_SERVER", "llama-server")
     model_value = env_value(values, "CLASSROOM_MODEL_FILE", str(DEFAULT_MODEL_FILE))
     model_file = Path(model_value).expanduser()

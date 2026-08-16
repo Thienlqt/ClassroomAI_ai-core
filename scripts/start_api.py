@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import sys
 from typing import Mapping
@@ -25,7 +24,7 @@ def build_environment(environ: Mapping[str, str] | None = None) -> dict[str, str
 def build_command(
     environ: Mapping[str, str] | None = None, *, reload: bool = False
 ) -> list[str]:
-    values = os.environ if environ is None else environ
+    values = child_environment(environ)
     command = [
         sys.executable,
         "-m",
