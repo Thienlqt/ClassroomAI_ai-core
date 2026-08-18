@@ -220,7 +220,8 @@ or separate frontend command. It provides:
 - a classroom scene with an animated, blinking VRM teacher
 - a generated classroom background and a static teacher fallback
 - student message input and teacher subtitles
-- a **Speak** button that records up to 30 seconds, transcribes locally, and sends the text to Gemma
+- a **Speak** button that calibrates room noise, detects speech in the browser, and stops after a natural pause
+- local Whisper transcription after recording, with a 30-second limit and a manual **Finish** fallback
 - automatic sequential English/Vietnamese Piper playback when the voices are available
 - projector-friendly `ui.show_choices` buttons
 - actual rendering of `ui.show_image` assets

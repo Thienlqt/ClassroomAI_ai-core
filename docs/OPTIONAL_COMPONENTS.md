@@ -134,11 +134,18 @@ The response is:
 {"text":"Can an eagle fly?"}
 ```
 
-The reference browser app's **Speak** button records for at most 30 seconds, sends the
-audio for transcription, and then submits the returned text to the normal student
-message endpoint. The API accepts at most 15 MiB and processes at most the first 60
-seconds. FFmpeg normalizes browser formats to the 16-bit, 16 kHz mono WAV input expected
-by whisper.cpp.
+The reference browser app's **Speak** button first calibrates to the current room noise,
+waits for sustained speech, and automatically stops after about 1.2 seconds of silence.
+This boundary detection uses Web Audio signal energy and does not load another model.
+The student can still press **Finish**, and recording is capped at 30 seconds. The audio
+is then transcribed and submitted to the normal student message endpoint. The API
+accepts at most 15 MiB and processes at most the first 60 seconds. FFmpeg normalizes
+browser formats to the 16-bit, 16 kHz mono WAV input expected by whisper.cpp.
+
+Energy-based detection rejects brief bumps and adapts to steady background noise, but
+it cannot tell the student's voice from another person speaking nearby. If classroom
+testing shows that limitation is material, replace only this browser gate with a small
+specialized VAD; Gemma still should not be used to detect audio boundaries.
 
 The defaults are configurable with `CLASSROOM_WHISPER_MODEL`,
 `CLASSROOM_WHISPER_LANGUAGE`, `CLASSROOM_WHISPER_COMMAND`,

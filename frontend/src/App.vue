@@ -14,6 +14,7 @@ import {
   synthesizeSpeech,
   transcribeAudio,
 } from "./services/api.js";
+import { calculateRms, VoiceActivityGate } from "./services/voiceActivity.js";
 
 const SESSION_KEY = "spatial-classroom-session-id";
 const messages = ref([
@@ -27,11 +28,21 @@ const provider = ref("local AI");
 const stageAction = ref(null);
 const pendingAction = ref(null);
 const speaking = ref(false);
+const recordingPhase = ref("idle");
+const voiceLevel = ref(0);
 
 let sessionId = getSessionId();
 let mediaRecorder;
+let microphoneStream;
 let recordingChunks = [];
 let recordingTimer;
+let voiceActivityTimer;
+let voiceAudioContext;
+let voiceSource;
+let voiceAnalyser;
+let voiceActivityGate;
+let recordingStopReason = "manual";
+let recordingHadSpeech = false;
 let currentAudio;
 let currentAudioUrl;
 let finishCurrentAudio;
@@ -138,9 +149,65 @@ function preferredAudioType() {
   return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
 }
 
+function stopVoiceActivityMonitor() {
+  clearInterval(voiceActivityTimer);
+  voiceActivityTimer = null;
+  voiceSource?.disconnect();
+  voiceAnalyser?.disconnect();
+  voiceSource = null;
+  voiceAnalyser = null;
+  voiceActivityGate = null;
+  voiceLevel.value = 0;
+  if (voiceAudioContext) void voiceAudioContext.close().catch(() => {});
+  voiceAudioContext = null;
+}
+
+function finishRecording(reason = "manual") {
+  if (mediaRecorder?.state !== "recording") return;
+  recordingStopReason = reason;
+  recordingHadSpeech ||= Boolean(voiceActivityGate?.speechDetected);
+  mediaRecorder.stop();
+}
+
+async function startVoiceActivityMonitor(stream) {
+  const AudioContext = globalThis.AudioContext || globalThis.webkitAudioContext;
+  if (!AudioContext) return false;
+
+  try {
+    voiceAudioContext = new AudioContext();
+    await voiceAudioContext.resume();
+    voiceSource = voiceAudioContext.createMediaStreamSource(stream);
+    voiceAnalyser = voiceAudioContext.createAnalyser();
+    voiceAnalyser.fftSize = 1024;
+    voiceAnalyser.smoothingTimeConstant = 0;
+    voiceSource.connect(voiceAnalyser);
+
+    const samples = new Float32Array(voiceAnalyser.fftSize);
+    voiceActivityGate = new VoiceActivityGate();
+    recordingPhase.value = "calibrating";
+    voiceActivityTimer = window.setInterval(() => {
+      if (!voiceAnalyser || mediaRecorder?.state !== "recording") return;
+      voiceAnalyser.getFloatTimeDomainData(samples);
+      const result = voiceActivityGate.update(calculateRms(samples), performance.now());
+      voiceLevel.value = Math.min(
+        1,
+        result.level / Math.max(result.startThreshold * 1.8, 0.001),
+      );
+      if (result.phase !== "stopped") recordingPhase.value = result.phase;
+      if (result.speechDetected) recordingHadSpeech = true;
+      if (result.stopReason) finishRecording(result.stopReason);
+    }, 50);
+    return true;
+  } catch (reason) {
+    console.warn("Automatic voice detection unavailable", reason);
+    stopVoiceActivityMonitor();
+    return false;
+  }
+}
+
 async function toggleRecording() {
   if (mediaRecorder?.state === "recording") {
-    mediaRecorder.stop();
+    finishRecording("manual");
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) {
@@ -150,38 +217,89 @@ async function toggleRecording() {
 
   try {
     error.value = "";
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    speechRequestId += 1;
+    stopCurrentAudio();
+    speaking.value = false;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl: { ideal: true },
+        channelCount: { ideal: 1 },
+      },
+    });
+    microphoneStream = stream;
     const mimeType = preferredAudioType();
-    mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    mediaRecorder = recorder;
     recordingChunks = [];
-    mediaRecorder.addEventListener("dataavailable", (event) => {
+    recordingStopReason = "manual";
+    recordingHadSpeech = false;
+    recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size) recordingChunks.push(event.data);
     });
-    mediaRecorder.addEventListener(
+    recorder.addEventListener(
       "stop",
       async () => {
         clearTimeout(recordingTimer);
+        recordingTimer = null;
+        const stopReason = recordingStopReason;
+        const heardSpeech = recordingHadSpeech;
+        stopVoiceActivityMonitor();
         stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(recordingChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+        microphoneStream = null;
+        const blob = new Blob(recordingChunks, { type: recorder.mimeType || "audio/webm" });
         mediaRecorder = null;
         recordingChunks = [];
         recording.value = false;
+        voiceLevel.value = 0;
+
+        if (stopReason === "cancelled") {
+          recordingPhase.value = "idle";
+          return;
+        }
+        if (stopReason === "no-speech" || (stopReason === "maximum-duration" && !heardSpeech)) {
+          recordingPhase.value = "idle";
+          error.value = "I didn’t hear any speech. Move closer to the microphone and try again.";
+          return;
+        }
+        if (!blob.size) {
+          recordingPhase.value = "idle";
+          error.value = "The microphone did not produce any audio. Please try again.";
+          return;
+        }
+
+        recordingPhase.value = "processing";
         busy.value = true;
         try {
           const transcript = await transcribeAudio(blob);
+          if (!transcript.text.trim()) {
+            throw new Error("I couldn’t understand the recording. Please try again.");
+          }
           busy.value = false;
           await sendStudentMessage(transcript.text.trim());
         } catch (reason) {
           error.value = reason.message;
           busy.value = false;
+        } finally {
+          recordingPhase.value = "idle";
         }
       },
       { once: true },
     );
-    mediaRecorder.start();
+    recorder.start();
     recording.value = true;
-    recordingTimer = window.setTimeout(() => mediaRecorder?.stop(), 30_000);
+    const automaticDetectionStarted = await startVoiceActivityMonitor(stream);
+    if (!automaticDetectionStarted) recordingPhase.value = "manual";
+    recordingTimer = window.setTimeout(() => finishRecording("maximum-duration"), 30_000);
   } catch (reason) {
+    stopVoiceActivityMonitor();
+    microphoneStream?.getTracks().forEach((track) => track.stop());
+    microphoneStream = null;
+    mediaRecorder = null;
+    recording.value = false;
+    recordingPhase.value = "idle";
     error.value = reason.name === "NotAllowedError"
       ? "Microphone permission was denied."
       : "The microphone could not be started.";
@@ -221,7 +339,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   clearTimeout(recordingTimer);
-  mediaRecorder?.stream?.getTracks().forEach((track) => track.stop());
+  if (mediaRecorder?.state === "recording") finishRecording("cancelled");
+  stopVoiceActivityMonitor();
+  microphoneStream?.getTracks().forEach((track) => track.stop());
   speechRequestId += 1;
   stopCurrentAudio();
 });
@@ -254,6 +374,8 @@ onBeforeUnmount(() => {
       :messages="messages"
       :busy="busy"
       :recording="recording"
+      :recording-phase="recordingPhase"
+      :voice-level="voiceLevel"
       :disabled="Boolean(pendingAction)"
       :error="error"
       @send="sendStudentMessage"

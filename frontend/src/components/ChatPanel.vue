@@ -1,16 +1,31 @@
 <script setup>
-import { nextTick, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 
 const props = defineProps({
   messages: { type: Array, required: true },
   busy: Boolean,
   recording: Boolean,
+  recordingPhase: { type: String, default: "idle" },
+  voiceLevel: { type: Number, default: 0 },
   disabled: Boolean,
   error: { type: String, default: "" },
 });
 const emit = defineEmits(["send", "toggle-recording", "reset"]);
 const draft = ref("");
 const conversation = ref(null);
+
+const voiceButtonLabel = computed(() => {
+  if (props.recording) return "Finish";
+  if (props.recordingPhase === "processing") return "Transcribing…";
+  return "Speak";
+});
+
+const voiceStatus = computed(() => ({
+  calibrating: "Checking room noise — get ready…",
+  listening: "Listening — start speaking",
+  speaking: "Voice detected — pause when finished",
+  manual: "Listening — press Finish when done",
+}[props.recordingPhase] || ""));
 
 watch(
   () => props.messages.length,
@@ -55,6 +70,13 @@ function submit() {
 
     <p v-if="error" class="chat-error" role="alert">{{ error }}</p>
 
+    <div v-if="recording" class="voice-status" :data-phase="recordingPhase" aria-live="polite">
+      <span class="voice-meter" aria-hidden="true">
+        <i :style="{ transform: `scaleX(${Math.max(0.04, voiceLevel)})` }"></i>
+      </span>
+      <span>{{ voiceStatus }}</span>
+    </div>
+
     <form class="chat-form" @submit.prevent="submit">
       <input
         v-model="draft"
@@ -67,13 +89,13 @@ function submit() {
       />
       <button
         class="speak-button"
-        :class="{ recording }"
+        :class="{ recording, speaking: recordingPhase === 'speaking' }"
         type="button"
         :disabled="busy || disabled"
         :aria-pressed="recording"
         @click="$emit('toggle-recording')"
       >
-        {{ recording ? "Stop" : "Speak" }}
+        {{ voiceButtonLabel }}
       </button>
       <button class="send-button" type="submit" :disabled="busy || recording || disabled">
         Send
@@ -152,11 +174,42 @@ function submit() {
 
 .chat-error { margin: 0 16px 8px; padding: 8px 10px; border-radius: 9px; color: #923c38; background: #f8e6e3; font-size: 12px; }
 
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 16px 8px;
+  color: #45675b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.voice-meter {
+  width: 44px;
+  height: 6px;
+  border-radius: 999px;
+  background: #d6e3dc;
+  overflow: hidden;
+}
+
+.voice-meter i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #45846b;
+  transform-origin: left;
+  transition: transform 80ms linear, background-color 160ms ease;
+}
+
+.voice-status[data-phase="speaking"] .voice-meter i { background: #c45147; }
+
 .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #dfe7e1; }
 .chat-form input { flex: 1; min-width: 0; padding: 12px 13px; border: 1px solid #ccd8d1; border-radius: 12px; background: white; }
 .chat-form button { padding: 0 14px; border-radius: 12px; font-weight: 850; }
 .speak-button { border: 1px solid #33785d; color: #28694f; background: #e0f1e8; }
 .speak-button.recording { border-color: #ae443d; color: white; background: #ae443d; }
+.speak-button.recording:not(.speaking) { border-color: #3e8066; background: #3e8066; }
 .send-button { border: 0; color: white; background: #286d53; }
 button:disabled, input:disabled { cursor: not-allowed; opacity: 0.55; }
 
