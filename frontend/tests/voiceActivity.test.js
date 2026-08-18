@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { calculateRms, VoiceActivityGate } from "../src/services/voiceActivity.js";
+import {
+  calculateRms,
+  matchSpokenChoice,
+  VoiceActivityGate,
+} from "../src/services/voiceActivity.js";
 
 
 test("calculateRms measures time-domain signal energy", () => {
@@ -50,4 +54,14 @@ test("voice gate ignores a short noise spike and times out without speech", () =
   assert.equal(stopped.phase, "stopped");
   assert.equal(stopped.speechDetected, false);
   assert.equal(stopped.stopReason, "no-speech");
+});
+
+
+test("spoken choices match labels and English or Vietnamese ordinals", () => {
+  const choices = ["Eagle", "Fish", "Dog"];
+
+  assert.equal(matchSpokenChoice("I choose the eagle", choices), "Eagle");
+  assert.equal(matchSpokenChoice("the second answer", choices), "Fish");
+  assert.equal(matchSpokenChoice("đáp án thứ ba", choices), "Dog");
+  assert.equal(matchSpokenChoice("eagle or fish", choices), null);
 });

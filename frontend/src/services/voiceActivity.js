@@ -17,6 +17,38 @@ export function calculateRms(samples) {
   return Math.sqrt(sumSquares / samples.length);
 }
 
+function normalizeSpeech(value) {
+  return String(value)
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+export function matchSpokenChoice(transcript, choices) {
+  const spoken = normalizeSpeech(transcript);
+  if (!spoken || !choices?.length) return null;
+
+  const normalizedChoices = choices.map((choice) => normalizeSpeech(choice));
+  const directMatches = normalizedChoices
+    .map((choice, index) => ({ choice, index }))
+    .filter(({ choice }) => choice && (` ${spoken} `).includes(` ${choice} `));
+  if (directMatches.length === 1) return choices[directMatches[0].index];
+
+  const ordinalAliases = [
+    ["1", "one", "first", "một", "thứ nhất"],
+    ["2", "two", "second", "hai", "thứ hai"],
+    ["3", "three", "third", "ba", "thứ ba"],
+    ["4", "four", "fourth", "bốn", "thứ tư"],
+  ];
+  const ordinalMatches = ordinalAliases
+    .slice(0, choices.length)
+    .map((aliases, index) => ({ index, found: aliases.some((alias) => (` ${spoken} `).includes(` ${alias} `)) }))
+    .filter(({ found }) => found);
+  return ordinalMatches.length === 1 ? choices[ordinalMatches[0].index] : null;
+}
+
 function percentile(values, fraction) {
   if (!values.length) return 0;
   const ordered = [...values].sort((a, b) => a - b);

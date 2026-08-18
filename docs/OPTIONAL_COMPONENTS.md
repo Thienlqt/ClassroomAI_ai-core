@@ -134,11 +134,13 @@ The response is:
 {"text":"Can an eagle fly?"}
 ```
 
-The reference browser app's **Speak** button first calibrates to the current room noise,
-waits for sustained speech, and automatically stops after about 1.2 seconds of silence.
-This boundary detection uses Web Audio signal energy and does not load another model.
-The student can still press **Finish**, and recording is capped at 30 seconds. The audio
-is then transcribed and submitted to the normal student message endpoint. The API
+The reference browser app requests microphone access on page load, then listens without
+a Speak/Stop button. It calibrates to the current room noise, waits for sustained speech,
+and treats about 1.2 seconds of silence as the end of a student turn. Listening pauses
+during transcription, Gemma processing, and Piper playback, then resumes automatically
+so the teacher does not transcribe its own voice. This boundary detection uses Web Audio
+signal energy and does not load another model. Each utterance is capped at 30 seconds,
+then transcribed and submitted to the normal student message endpoint. The API
 accepts at most 15 MiB and processes at most the first 60 seconds. FFmpeg normalizes
 browser formats to the 16-bit, 16 kHz mono WAV input expected by whisper.cpp.
 

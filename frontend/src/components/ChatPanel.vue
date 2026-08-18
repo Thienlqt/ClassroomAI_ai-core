@@ -7,24 +7,31 @@ const props = defineProps({
   recording: Boolean,
   recordingPhase: { type: String, default: "idle" },
   voiceLevel: { type: Number, default: 0 },
+  microphoneEnabled: Boolean,
+  microphoneMuted: Boolean,
   disabled: Boolean,
   error: { type: String, default: "" },
 });
-const emit = defineEmits(["send", "toggle-recording", "reset"]);
+const emit = defineEmits(["send", "toggle-microphone", "reset"]);
 const draft = ref("");
 const conversation = ref(null);
 
 const voiceButtonLabel = computed(() => {
-  if (props.recording) return "Finish";
-  if (props.recordingPhase === "processing") return "Transcribing…";
-  return "Speak";
+  if (props.recordingPhase === "requesting") return "Starting…";
+  if (props.microphoneMuted) return "Unmute";
+  if (props.recordingPhase === "unavailable") return "Retry mic";
+  return props.microphoneEnabled ? "Mute" : "Retry mic";
 });
 
 const voiceStatus = computed(() => ({
-  calibrating: "Checking room noise — get ready…",
-  listening: "Listening — start speaking",
-  speaking: "Voice detected — pause when finished",
-  manual: "Listening — press Finish when done",
+  requesting: "Requesting microphone access…",
+  calibrating: "Checking room noise — the teacher will listen automatically",
+  listening: "Teacher is listening — just start speaking",
+  speaking: "Teacher hears you — pause when finished",
+  processing: "Understanding what you said…",
+  paused: "Listening is paused while the teacher responds",
+  muted: "Microphone is muted",
+  unavailable: "Microphone unavailable",
 }[props.recordingPhase] || ""));
 
 watch(
@@ -51,7 +58,7 @@ function submit() {
         <small>Your English teacher</small>
         <strong>Gemma</strong>
       </div>
-      <button type="button" :disabled="busy || recording" @click="$emit('reset')">
+      <button type="button" :disabled="busy" @click="$emit('reset')">
         New lesson
       </button>
     </div>
@@ -70,7 +77,7 @@ function submit() {
 
     <p v-if="error" class="chat-error" role="alert">{{ error }}</p>
 
-    <div v-if="recording" class="voice-status" :data-phase="recordingPhase" aria-live="polite">
+    <div v-if="recordingPhase !== 'idle'" class="voice-status" :data-phase="recordingPhase" aria-live="polite">
       <span class="voice-meter" aria-hidden="true">
         <i :style="{ transform: `scaleX(${Math.max(0.04, voiceLevel)})` }"></i>
       </span>
@@ -84,20 +91,20 @@ function submit() {
         maxlength="2000"
         autocomplete="off"
         placeholder="Ask Gemma about an animal…"
-        :disabled="busy || recording || disabled"
+        :disabled="busy || disabled"
         aria-label="Message Gemma"
       />
       <button
-        class="speak-button"
-        :class="{ recording, speaking: recordingPhase === 'speaking' }"
+        class="microphone-button"
+        :class="{ active: microphoneEnabled, muted: microphoneMuted }"
         type="button"
-        :disabled="busy || disabled"
-        :aria-pressed="recording"
-        @click="$emit('toggle-recording')"
+        :disabled="recordingPhase === 'requesting'"
+        :aria-pressed="microphoneMuted"
+        @click="$emit('toggle-microphone')"
       >
         {{ voiceButtonLabel }}
       </button>
-      <button class="send-button" type="submit" :disabled="busy || recording || disabled">
+      <button class="send-button" type="submit" :disabled="busy || disabled">
         Send
       </button>
     </form>
@@ -207,9 +214,9 @@ function submit() {
 .chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #dfe7e1; }
 .chat-form input { flex: 1; min-width: 0; padding: 12px 13px; border: 1px solid #ccd8d1; border-radius: 12px; background: white; }
 .chat-form button { padding: 0 14px; border-radius: 12px; font-weight: 850; }
-.speak-button { border: 1px solid #33785d; color: #28694f; background: #e0f1e8; }
-.speak-button.recording { border-color: #ae443d; color: white; background: #ae443d; }
-.speak-button.recording:not(.speaking) { border-color: #3e8066; background: #3e8066; }
+.microphone-button { border: 1px solid #33785d; color: #28694f; background: #e0f1e8; }
+.microphone-button.active { border-color: #3e8066; color: white; background: #3e8066; }
+.microphone-button.muted { border-color: #98665f; color: #7b443d; background: #f4e4e1; }
 .send-button { border: 0; color: white; background: #286d53; }
 button:disabled, input:disabled { cursor: not-allowed; opacity: 0.55; }
 
