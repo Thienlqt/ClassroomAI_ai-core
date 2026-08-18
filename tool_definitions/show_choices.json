@@ -1,0 +1,35 @@
+{
+  "type": "function",
+  "function": {
+    "name": "show_choices",
+    "description": "Display exactly one multiple-choice English activity and wait for the student to choose. You must use this tool when the student asks for an interactive question, multiple-choice question, quiz, or selectable choices.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "A short English question shown to the student."
+        },
+        "choices": {
+          "type": "array",
+          "description": "Two to four short, unique answer choices.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 4
+        },
+        "correct_answer": {
+          "type": "string",
+          "description": "The exact text of one item in choices."
+        }
+      },
+      "required": [
+        "question",
+        "choices",
+        "correct_answer"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

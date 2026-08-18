@@ -1,0 +1,26 @@
+{
+  "type": "function",
+  "function": {
+    "name": "show_image",
+    "description": "Ask the classroom app to display one approved offline animal image. You must use this tool when the student explicitly asks to see, show, or look at a picture or image of an available animal.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "image_id": {
+          "type": "string",
+          "enum": [],
+          "description": "The approved ID of the image to display. The application fills this list from the local image catalog."
+        },
+        "caption": {
+          "type": "string",
+          "description": "A short English label for the image."
+        }
+      },
+      "required": [
+        "image_id",
+        "caption"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

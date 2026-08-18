@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-16T11:12:50.126101+00:00",
+  "base_url": "http://127.0.0.1:8000",
+  "service": {
+    "status": "ok",
+    "model": "gemma4-e4b",
+    "provider": "llama_cpp"
+  },
+  "scenario_count": 1,
+  "runs_per_scenario": 10,
+  "summary": {
+    "passed": 2,
+    "failed": 8,
+    "pass_rate": 0.2,
+    "latency_seconds": {
+      "mean": 1.733,
+      "p50": 1.86,
+      "p95": 2.171,
+      "max": 2.171
+    }
+  },
+  "results": [
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 1,
+      "passed": true,
+      "failures": [],
+      "status_code": 200,
+      "first_latency_seconds": 2.1,
+      "total_latency_seconds": 3.298,
+      "first_output": {
+        "type": "action",
+        "speech": null,
+        "action": {
+          "call_id": "0a45ee9b-f831-41be-ba9d-968e0b1e4166",
+          "type": "ui.show_choices",
+          "payload": {
+            "question": "Which sentence is true about a fish?",
+            "choices": [
+              "The fish can fly.",
+              "The fish can swim.",
+              "The fish can walk."
+            ]
+          }
+        }
+      },
+      "follow_output": {
+        "type": "speech",
+        "speech": "That is not correct. Fish cannot fly. Can you try again? What about the other choices?",
+        "action": null
+      }
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 2,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 1.86,
+      "total_latency_seconds": 1.86,
+      "first_output": {
+        "type": "speech",
+        "speech": "What is the name of the animal that can fly in the sky?\n\nA) Dog\nB) Fish\nC) Eagle",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 3,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 1.682,
+      "total_latency_seconds": 1.682,
+      "first_output": {
+        "type": "speech",
+        "speech": "Let's learn about animals! Here is a quiz about animals.\n\nshow_choices{choices:[<|\"|>fly<|\"|>,<|\"|>swim<|\"|>,<|\"|>run<|\"|>],correct_answer:<|\"|>fly<|\"|>,question:<|\"|>An eagle can ________.<|\"|>}",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 4,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 2.106,
+      "total_latency_seconds": 2.106,
+      "first_output": {
+        "type": "speech",
+        "speech": "Here is your first quiz! Which animal is known for being very big and strong?\n\nshow_choices{choices:[<|\"|>dog<|\"|>,<|\"|>fish<|\"|>,<|\"|>lion<|\"|>,<|\"|>eagle<|\"|>],correct_answer:<|\"|>lion<|\"|>,question:<|\"|>Which animal is known for being very big and strong?<|\"|>}",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 5,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 2.171,
+      "total_latency_seconds": 2.171,
+      "first_output": {
+        "type": "speech",
+        "speech": "Let's play a quiz! Which sentence is correct?\n\nshow_choices{choices:[<|\"|>The fish can fly.<|\"|>,<|\"|>The fish can swim.<|\"|>,<|\"|>The fish can walk.<|\"|>],correct_answer:<|\"|>The fish can swim.<|\"|>,question:<|\"|>What can a fish do?<|\"|>}",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 6,
+      "passed": true,
+      "failures": [],
+      "status_code": 200,
+      "first_latency_seconds": 1.373,
+      "total_latency_seconds": 2.499,
+      "first_output": {
+        "type": "action",
+        "speech": null,
+        "action": {
+          "call_id": "9a321bfa-1e91-4345-98ae-821e1d26aabc",
+          "type": "ui.show_choices",
+          "payload": {
+            "question": "What can a fish do?",
+            "choices": [
+              "swim",
+              "fly",
+              "walk"
+            ]
+          }
+        }
+      },
+      "follow_output": {
+        "type": "speech",
+        "speech": "That is correct! A fish can swim. Do you know what another animal can do?",
+        "action": null
+      }
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 7,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 1.864,
+      "total_latency_seconds": 1.864,
+      "first_output": {
+        "type": "speech",
+        "speech": "Let's learn about animals! Look at this question:\n\nCan a fish fly?\nA) Yes\nB) No",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 8,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 1.455,
+      "total_latency_seconds": 1.455,
+      "first_output": {
+        "type": "speech",
+        "speech": "Let's play a quiz! What does this sentence mean?\n\n\"The fish can swim.\"\n\nA) The fish can run.\nB) The fish can swim.\nC) The fish can fly.",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 9,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 0.849,
+      "total_latency_seconds": 0.849,
+      "first_output": {
+        "type": "speech",
+        "speech": "What kind of animal is this?\n\nA) Fish\nB) Dog\nC) Lion\n\nWhich one is correct?",
+        "action": null
+      },
+      "follow_output": null
+    },
+    {
+      "scenario_id": "interactive_quiz",
+      "category": "tool_use",
+      "run": 10,
+      "passed": false,
+      "failures": [
+        "expected type 'action', received 'speech'"
+      ],
+      "status_code": 200,
+      "first_latency_seconds": 1.866,
+      "total_latency_seconds": 1.866,
+      "first_output": {
+        "type": "speech",
+        "speech": "What animal is known for being able to fly?\n\nshow_choices{choices:[<|\"|>fish<|\"|>,<|\"|>dog<|\"|>,<|\"|>eagle<|\"|>,<|\"|>lion<|\"|>],correct_answer:<|\"|>eagle<|\"|>,question:<|\"|>What animal is known for being able to fly?<|\"|>}",
+        "action": null
+      },
+      "follow_output": null
+    }
+  ]
+}
